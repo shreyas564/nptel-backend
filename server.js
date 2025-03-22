@@ -9,42 +9,24 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Configure CORS to allow requests from the Chrome extension
-app.use(cors({
-  origin: ['chrome-extension://jpodbbdeijbdjkhhafhedahegamgdjpp', 'http://localhost:3000'],
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'x-api-key'],
-  credentials: false,
-}));
-
 // Middleware
+app.use(cors()); // Allow cross-origin requests
 app.use(express.json()); // Parse JSON bodies
 
 // MongoDB connection
 const mongoURI = process.env.MONGO_URI;
-console.log('MONGO_URI:', mongoURI);
-
-if (!mongoURI) {
-  console.error('Error: MONGO_URI is not defined in the .env file or environment variables.');
-  process.exit(1);
-}
-
 mongoose.connect(mongoURI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
   .then(() => console.log('Connected to MongoDB Atlas'))
-  .catch(err => {
-    console.error('MongoDB connection error:', err);
-    process.exit(1);
-  });
+  .catch(err => console.error('MongoDB connection error:', err));
 
 // Define the User schema
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
-  email: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
   score: { type: Number, required: true },
-  courseName: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
@@ -54,33 +36,28 @@ const User = mongoose.model('User', userSchema);
 
 // API endpoint to store data
 app.post('/store-data', async (req, res) => {
-  const { name, email, score, courseName } = req.body;
+  const { name, email, score } = req.body;
 
-  // Validate required fields
-  if (!name || !email || score === undefined || !courseName) {
-    return res.status(400).json({ error: 'Name, email, score, and courseName are required' });
-  }
-
-  // Validate score to ensure it's a number
-  if (isNaN(score)) {
-    return res.status(400).json({ error: 'Score must be a number' });
+  if (!name || !email || score === undefined) {
+    return res.status(400).json({ error: 'Name, email, and score are required' });
   }
 
   try {
-    // Check if a record with the same name, email, and courseName already exists
-    const existingUser = await User.findOne({ name, email, courseName });
+    // Check if the user already exists (based on email)
+    let user = await User.findOne({ email });
 
-    if (existingUser) {
-      // Update the existing record
-      existingUser.score = score;
-      existingUser.updatedAt = Date.now();
-      await existingUser.save();
-      return res.status(200).json({ message: 'User data updated successfully' });
+    if (user) {
+      // Update existing user
+      user.name = name;
+      user.score = score;
+      user.updatedAt = Date.now();
+      await user.save();
+      res.status(200).json({ message: 'User data updated successfully' });
     } else {
-      // Create a new record
-      const newUser = new User({ name, email, score, courseName });
-      await newUser.save();
-      return res.status(201).json({ message: 'User data stored successfully' });
+      // Create new user
+      user = new User({ name, email, score });
+      await user.save();
+      res.status(201).json({ message: 'User data stored successfully' });
     }
   } catch (error) {
     console.error('Error storing data:', error);
