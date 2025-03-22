@@ -3,21 +3,29 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 
+// Load environment variables from .env file
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Configure CORS to allow requests from the Chrome extension
+app.use(cors({
+  origin: ['chrome-extension://jpodbbdeijbdjkhhafhedahegamgdjpp', 'http://localhost:3000'],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'x-api-key'],
+  credentials: false,
+}));
+
 // Middleware
-app.use(cors());
-app.use(express.json());
+app.use(express.json()); // Parse JSON bodies
 
 // MongoDB connection
 const mongoURI = process.env.MONGO_URI;
 console.log('MONGO_URI:', mongoURI);
 
 if (!mongoURI) {
-  console.error('Error: MONGO_URI is not defined.');
+  console.error('Error: MONGO_URI is not defined in the .env file or environment variables.');
   process.exit(1);
 }
 
@@ -41,42 +49,41 @@ const userSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now },
 });
 
-// Ensure uniqueness based on email + courseName
-userSchema.index({ email: 1, courseName: 1 }, { unique: true });
-
+// Create the User model
 const User = mongoose.model('User', userSchema);
 
-// API endpoint to store or update course data for a user
+// API endpoint to store data
 app.post('/store-data', async (req, res) => {
+  const { name, email, score, courseName } = req.body;
+
+  // Validate required fields
+  if (!name || !email || score === undefined || !courseName) {
+    return res.status(400).json({ error: 'Name, email, score, and courseName are required' });
+  }
+
+  // Validate score to ensure it's a number
+  if (isNaN(score)) {
+    return res.status(400).json({ error: 'Score must be a number' });
+  }
+
   try {
-    console.log('Incoming request:', req.body);
+    // Check if a record with the same name, email, and courseName already exists
+    const existingUser = await User.findOne({ name, email, courseName });
 
-    const { name, email, score, courseName } = req.body;
-
-    if (!name || !email || score === undefined || !courseName) {
-      return res.status(400).json({ error: 'All fields are required' });
+    if (existingUser) {
+      // Update the existing record
+      existingUser.score = score;
+      existingUser.updatedAt = Date.now();
+      await existingUser.save();
+      return res.status(200).json({ message: 'User data updated successfully' });
+    } else {
+      // Create a new record
+      const newUser = new User({ name, email, score, courseName });
+      await newUser.save();
+      return res.status(201).json({ message: 'User data stored successfully' });
     }
-
-    if (isNaN(score)) {
-      return res.status(400).json({ error: 'Score must be a number' });
-    }
-
-    const result = await User.findOneAndUpdate(
-      { email, courseName },
-      { $set: { name, score, updatedAt: Date.now() } },
-      { upsert: true, new: true, runValidators: true }
-    );
-
-    console.log('Database operation result:', result);
-    res.status(200).json({ message: 'Data stored/updated successfully' });
-
   } catch (error) {
     console.error('Error storing data:', error);
-
-    if (error.code === 11000) {
-      return res.status(409).json({ error: 'Duplicate entry detected' });
-    }
-
     res.status(500).json({ error: 'Failed to store data' });
   }
 });
