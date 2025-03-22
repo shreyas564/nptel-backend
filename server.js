@@ -47,12 +47,8 @@ const User = mongoose.model('User', userSchema);
 
 // API endpoint to store data
 app.post('/store-data', (req, res) => {
-  const apiKey = req.headers['x-api-key'];
-  if (apiKey !== process.env.API_KEY) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  const { name, email, score, courseName } = req.body; // Add courseName to destructuring
+  // Removed API key authentication
+  const { name, email, score, courseName } = req.body;
 
   if (!name || !email || score === undefined || !courseName) {
     return res.status(400).json({ error: 'Name, email, score, and courseName are required' });
@@ -69,13 +65,13 @@ app.post('/store-data', (req, res) => {
         // Update existing user
         user.name = name;
         user.score = score;
-        user.courseName = courseName; // Update courseName
+        user.courseName = courseName;
         user.updatedAt = Date.now();
         return user.save()
           .then(() => res.status(200).json({ message: 'User data updated successfully' }));
       } else {
         // Create new user
-        const newUser = new User({ name, email, score, courseName }); // Include courseName
+        const newUser = new User({ name, email, score, courseName });
         return newUser.save()
           .then(() => res.status(201).json({ message: 'User data stored successfully' }));
       }
