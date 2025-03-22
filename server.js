@@ -29,57 +29,55 @@ mongoose.connect(mongoURI, {
   .then(() => console.log('Connected to MongoDB Atlas'))
   .catch(err => {
     console.error('MongoDB connection error:', err);
-    process.exit(1); // Exit the process with an error
+    process.exit(1);
   });
 
 // Define the User schema
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
+  email: { type: String, required: true }, // No unique constraint
   score: { type: Number, required: true },
-  courseName: { type: String, required: true }, // Add courseName field
+  courseName: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
 
-// Create the User model
+// Ensure uniqueness based on email + courseName
+userSchema.index({ email: 1, courseName: 1 }, { unique: true });
+
 const User = mongoose.model('User', userSchema);
 
-// API endpoint to store data
-app.post('/store-data', (req, res) => {
-  // Removed API key authentication
+// API endpoint to store or update course data for a user
+app.post('/store-data', async (req, res) => {
   const { name, email, score, courseName } = req.body;
 
   if (!name || !email || score === undefined || !courseName) {
     return res.status(400).json({ error: 'Name, email, score, and courseName are required' });
   }
 
-  // Validate score to ensure it's a number
   if (isNaN(score)) {
     return res.status(400).json({ error: 'Score must be a number' });
   }
 
-  User.findOne({ email })
-    .then(user => {
-      if (user) {
-        // Update existing user
-        user.name = name;
-        user.score = score;
-        user.courseName = courseName;
-        user.updatedAt = Date.now();
-        return user.save()
-          .then(() => res.status(200).json({ message: 'User data updated successfully' }));
-      } else {
-        // Create new user
-        const newUser = new User({ name, email, score, courseName });
-        return newUser.save()
-          .then(() => res.status(201).json({ message: 'User data stored successfully' }));
-      }
-    })
-    .catch(error => {
-      console.error('Error storing data:', error);
-      res.status(500).json({ error: 'Failed to store data' });
-    });
+  try {
+    // Update if email & courseName match, otherwise insert new
+    const result = await User.updateOne(
+      { email, courseName }, // Unique condition
+      { $set: { name, score, updatedAt: Date.now() } }, // Update fields
+      { upsert: true } // Insert if not found
+    );
+
+    if (result.upsertedCount > 0) {
+      res.status(201).json({ message: 'New course entry stored successfully' });
+    } else if (result.modifiedCount > 0) {
+      res.status(200).json({ message: 'Course entry updated successfully' });
+    } else {
+      res.status(200).json({ message: 'No changes were made' });
+    }
+  } catch (error) {
+    console.error('Error storing data:', error);
+    res.status(500).json({ error: 'Failed to store data' });
+  }
 });
 
 // Start the server
