@@ -89,8 +89,8 @@ app.get('/fetch-data', async (req, res) => {
   }
 
   try {
-    // Find all records matching the email
-    const records = await User.find({ email }).select('name courseName score');
+    // Find all records matching the email, return only name, courseName, and score
+    const records = await User.find({ email }).select('name courseName score -_id');
     if (records.length === 0) {
       return res.status(404).json({ message: 'No records found for the given email' });
     }
