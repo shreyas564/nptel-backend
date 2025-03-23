@@ -11,7 +11,7 @@ const port = process.env.PORT || 3000;
 
 // Configure CORS
 app.use(cors({
-  origin: ['chrome-extension://jpodbbdeijbdjkhhafhedahegamgdjpp', 'http://localhost:3000'],
+  origin: ['chrome-extension://jpodbbdeijbdjkhhafhedahegamgdjpp', 'http://localhost:3000','https://nptel-marks-fetcher.onrender.com'],
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'x-api-key'],
   credentials: false,
