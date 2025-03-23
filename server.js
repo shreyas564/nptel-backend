@@ -79,20 +79,20 @@ app.post('/store-data', async (req, res) => {
   }
 });
 
-// API endpoint to fetch data by email and name
+// API endpoint to fetch data by email
 app.get('/fetch-data', async (req, res) => {
-  const { email, name } = req.query;
+  const { email } = req.query;
 
-  // Validate required query parameters
-  if (!email || !name) {
-    return res.status(400).json({ error: 'Email and name are required' });
+  // Validate required query parameter
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
   }
 
   try {
-    // Find all records matching the email and name
-    const records = await User.find({ email, name }).select('courseName score createdAt updatedAt -_id');
+    // Find all records matching the email
+    const records = await User.find({ email }).select('name courseName score');
     if (records.length === 0) {
-      return res.status(404).json({ message: 'No records found for the given email and name' });
+      return res.status(404).json({ message: 'No records found for the given email' });
     }
     res.status(200).json(records);
   } catch (error) {
